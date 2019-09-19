@@ -3,14 +3,14 @@
 import random
 import time
 #-----Initialize Variables-----
-roll= 0 #Roll the die
-playerscore = 0 #Your rolled points
-johnscore = 0 #John's rolled points
-playerhold = 0 #Your held points
-johnhold = 0 #John's held points
-johnchoice = 0 #John's choice for ROLL or HOLD
+roll= 0  #Roll the die
+playerscore = 0  #Your rolled points
+johnscore = 0  #John's rolled points
+playerhold = 0  #Your held points
+johnhold = 0  #John's held points
+johnchoice = 0  #John's choice for ROLL or HOLD
 #-----Game of Pig Begins-----
-print("You are playing against John Scarne, the creator of Pig.", end=" ")
+print("You are playing against John Scarne, the creator of Pig.\n", end=" ")
 while (playerhold < 100 and johnhold < 100):
     playerchoice = input("Would you like to ROLL or HOLD?" + " Your score: " + str(playerhold) +  " John's Score: " + str(johnhold)).upper()
     while (playerchoice != "ROLL" and playerchoice != "HOLD"):
@@ -20,9 +20,11 @@ while (playerhold < 100 and johnhold < 100):
         if (roll != 1):
             print("You rolled a " + str(roll) + ".")
             playerscore = playerscore + roll
+            continue
         elif (roll == 1):
             print("You rolled a 1. Your turn is over.")
     if (playerchoice == "HOLD"):
+        playerhold = playerscore + playerhold
         print("You will hold.")
         print("John's turn.")
         #-----John Decision-Making-----
@@ -39,3 +41,8 @@ while (playerhold < 100 and johnhold < 100):
         elif (johnchoice == 2):
             johnhold = johnhold + johnchoice
             print("John will hold.")
+#-----End of the Game-----
+if (playerhold >= 100):
+    print("You won with " + str(playerhold) + " points!!!")
+elif (johnhold >= 100):
+    print("John Scarne won with " + str(playerhold) + " points!!!")
