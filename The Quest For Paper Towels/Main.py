@@ -80,7 +80,7 @@ class Player(pygame.sprite.Sprite):
         self.area = screen.get_rect()
         self.coordinates = [self.rect.x, self.rect.y]
         self.walk_thread = threading.Thread(target=self.walk)
-        self.hit = 0
+        self.hit = 0 #PROBLEM?
         self.walking = 0
         self.move = 5
     def player_input(self):
@@ -93,22 +93,22 @@ class Player(pygame.sprite.Sprite):
                 self.walking = 1
                 if not self.walk_thread.isAlive():
                     self.walk_thread.start()
-            elif key[K_a]:
+            if key[K_a]:
                 self.key = "a"
                 self.walking = 1
                 if not self.walk_thread.isAlive():
                     self.walk_thread.start()
-            elif key[K_s]:
+            if key[K_s]:
                 self.key = "s"
                 self.walking = 1
                 if not self.walk_thread.isAlive():
                     self.walk_thread.start()
-            elif key[K_d]:
+            if key[K_d]:
                 self.key = "d"
                 self.walking = 1
                 if not self.walk_thread.isAlive():
                     self.walk_thread.start()
-            elif key[K_f]:
+            if key[K_f]:
                 self.attack()
             for event in pygame.event.get():
                 if event.type == KEYUP:
@@ -133,7 +133,7 @@ class Player(pygame.sprite.Sprite):
             if (self.key == "d"):
                 self.rect = self.rect.move((self.move, 0))
                 self.coordinates[0] += self.move
-            print(self.coordinates)
+            print(self.coordinates) #PLAYER ICON DISAPPEARS WITHOUT THIS
     def hit(self):
         self.original = self.image
         self.rect = self.rect.move((10, 0))
