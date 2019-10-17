@@ -29,18 +29,28 @@ def load_image(name, colorkey=None):
         if colorkey == -1:
             colorkey = image.get_at((0, 0))
         image.set_colorkey(colorkey, RLEACCEL)
-    return image, image.get_rect()
+    return image, image.get_rect(), name
 
 class Enemies(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.health = 10
-        self.image, self.rect = load_image(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\red-square.jpg", -1)
+        self.image, self.rect, self.sprite_path = load_image(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-still.png", -1)
+        self.direction = "left"
         self.rect = self.rect.move((400,0))
         self.coordinates = [self.rect.x, self.rect.y]
         self.hit = 0
         self.move = 1
     def update(self, walking = False):
+        #Update direction
+        self.sprite_path = list(self.sprite_path)
+        self.sprite_path = self.sprite_path.split("-")
+        if "left" in self.sprite_path: #Is enemy facing left
+            self.direction = "left"
+        else:
+            self.direction = "right"
+        self.sprite_path = "".join(self.sprite_path)
+        #Update status
         if self.hit:
             self.hit()
         if self.rect.colliderect(player.rect):
@@ -56,22 +66,32 @@ class Enemies(pygame.sprite.Sprite):
         pass
         self.original = self.image
     def walk(self):
-            if (player.coordinates[0] > self.coordinates[0]):
+            if (player.coordinates[0] > self.coordinates[0]): #If player is right of enemy, move right
+                if self.direction == "left":
+                    self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict["right-still"], -1)
+
                 self.rect = self.rect.move((self.move, 0))
                 self.coordinates[0] += self.move
             else:
-                self.rect = self.rect.move((-self.move, 0))
+                self.rect = self.rect.move((-self.move, 0)) #Player is left of enemy; move left
                 self.coordinates[0] += -self.move
             self.update(True)
             wait(0.01)
-            if (player.coordinates[1] > self.coordinates[1]):
+            if (player.coordinates[1] > self.coordinates[1]): #If player is above enemy, move up
                 self.rect = self.rect.move((0, self.move))
                 self.coordinates[1] += self.move
             else:
-                self.rect = self.rect.move((0, -self.move))
+                self.rect = self.rect.move((0, -self.move)) #Player is below enemy; move down
                 self.coordinates[1] += -self.move
             wait(0.01)
+    sprite_path_dict = {
+        "left-still": r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-still.png",
+        "left-moving": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-moving.png",
+        "right-still": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-right-still.png",
+        "right-moving": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-right-moving.png"
+        }
 class Player(pygame.sprite.Sprite):
+
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         screen = pygame.display.get_surface()
@@ -83,6 +103,7 @@ class Player(pygame.sprite.Sprite):
         self.hit = 0 #PROBLEM?
         self.walking = 0
         self.move = 5
+
     def player_input(self):
         while True:
             self.key = None
@@ -114,26 +135,29 @@ class Player(pygame.sprite.Sprite):
                 if event.type == KEYUP:
                     self.walking = 0
                     self.walk_thread.join(1.0)
+
     def update(self):
         if self.hit:
             self.hit()
         if self.attack:
             self.attack()
+
     def walk(self):
         while self.walking:
             if (self.key == "w"):
                 self.rect = self.rect.move((0, -self.move))
                 self.coordinates[1] += -self.move
-            if (self.key == "a"):
+            if (self.key == "a") and not (self.rect.move((-self.move, 0)).colliderect(enemies.rect)): #Player cannot move through enemy (left)
                 self.rect = self.rect.move((-self.move, 0))
                 self.coordinates[0] += -self.move
             if (self.key == "s"):
                 self.rect = self.rect.move((0, self.move))
                 self.coordinates[1] += self.move
-            if (self.key == "d"):
+            if (self.key == "d") and not (self.rect.move((self.move, 0)).colliderect(enemies.rect)): #Player cannot move through enemy (right)
                 self.rect = self.rect.move((self.move, 0))
                 self.coordinates[0] += self.move
             print(self.coordinates) #PLAYER ICON DISAPPEARS WITHOUT THIS
+            
     def hit(self):
         self.original = self.image
         self.rect = self.rect.move((10, 0))
