@@ -7,7 +7,7 @@ pygame.init()
 print(os.getcwd())
 
 wait = lambda secs: time.sleep(secs)
-screen = pygame.display.set_mode((500,900))
+screen = pygame.display.set_mode((600,600))
 pygame.display.set_caption("The Quest For Paper Towels")
 pygame.mouse.set_visible(0)
 background = pygame.Surface(screen.get_size()).convert()
@@ -40,10 +40,9 @@ class Enemies(pygame.sprite.Sprite):
         self.rect = self.rect.move((400,0))
         self.coordinates = [self.rect.x, self.rect.y]
         self.hit = 0
-        self.move = 1
+        self.speed = 1
     def update(self, walking = False):
         #Update direction
-        self.sprite_path = list(self.sprite_path)
         self.sprite_path = self.sprite_path.split("-")
         if "left" in self.sprite_path: #Is enemy facing left
             self.direction = "left"
@@ -66,24 +65,30 @@ class Enemies(pygame.sprite.Sprite):
         pass
         self.original = self.image
     def walk(self):
-            if (player.coordinates[0] > self.coordinates[0]): #If player is right of enemy, move right
-                if self.direction == "left":
-                    self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict["right-still"], -1)
-
-                self.rect = self.rect.move((self.move, 0))
-                self.coordinates[0] += self.move
-            else:
-                self.rect = self.rect.move((-self.move, 0)) #Player is left of enemy; move left
-                self.coordinates[0] += -self.move
-            self.update(True)
-            wait(0.01)
-            if (player.coordinates[1] > self.coordinates[1]): #If player is above enemy, move up
-                self.rect = self.rect.move((0, self.move))
-                self.coordinates[1] += self.move
-            else:
-                self.rect = self.rect.move((0, -self.move)) #Player is below enemy; move down
-                self.coordinates[1] += -self.move
-            wait(0.01)
+        if (player.coordinates[0] > self.coordinates[0]): #If player is right of enemy, move right
+            if self.direction == "left":
+                self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict["right-still"], -1)
+            self.original = self.image
+            self.rect = self.rect.move((self.speed, 0))
+            self.coordinates[0] += self.speed
+        else:
+            if self.direction == "right":
+                self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict["left-still"], -1)
+            self.original = self.image
+            self.rect = self.rect.move((-self.speed, 0)) #Player is left of enemy; move left
+            self.coordinates[0] += -self.speed
+        self.update(True)
+        wait(0.01)
+        if (player.coordinates[1] > self.coordinates[1]): #If player is above enemy, move up
+            self.rect = self.rect.move((0, self.speed))
+            self.coordinates[1] += self.speed
+        else:
+            self.rect = self.rect.move((0, -self.speed)) #Player is below enemy; move down
+            self.coordinates[1] += -self.speed
+        wait(0.01)
+    def walk_animation(self, direction):
+        self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict[direction], -1)
+        self.rect = self.recg #PUT WALK PROGRAM HERE
     sprite_path_dict = {
         "left-still": r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-still.png",
         "left-moving": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-moving.png",
@@ -96,67 +101,23 @@ class Player(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         screen = pygame.display.get_surface()
         self.health = 100
-        self.image, self.rect = load_image(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\blue-square.jpg", -1)
+        self.image, self.rect, self.sprite_path = load_image(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\blue-square.jpg", -1)
         self.area = screen.get_rect()
         self.coordinates = [self.rect.x, self.rect.y]
-        self.walk_thread = threading.Thread(target=self.walk)
         self.hit = 0 #PROBLEM?
-        self.walking = 0
-        self.move = 5
-
-    def player_input(self):
-        while True:
-            self.key = None
-            pygame.event.pump()
-            key = pygame.key.get_pressed()
-            if key[K_w]:
-                self.key = "w"
-                self.walking = 1
-                if not self.walk_thread.isAlive():
-                    self.walk_thread.start()
-            if key[K_a]:
-                self.key = "a"
-                self.walking = 1
-                if not self.walk_thread.isAlive():
-                    self.walk_thread.start()
-            if key[K_s]:
-                self.key = "s"
-                self.walking = 1
-                if not self.walk_thread.isAlive():
-                    self.walk_thread.start()
-            if key[K_d]:
-                self.key = "d"
-                self.walking = 1
-                if not self.walk_thread.isAlive():
-                    self.walk_thread.start()
-            if key[K_f]:
-                self.attack()
-            for event in pygame.event.get():
-                if event.type == KEYUP:
-                    self.walking = 0
-                    self.walk_thread.join(1.0)
+        self.moving = 0
+        self.speed = [0, 0]
 
     def update(self):
         if self.hit:
             self.hit()
         if self.attack:
             self.attack()
+        self.walk()
 
     def walk(self):
-        while self.walking:
-            if (self.key == "w"):
-                self.rect = self.rect.move((0, -self.move))
-                self.coordinates[1] += -self.move
-            if (self.key == "a") and not (self.rect.move((-self.move, 0)).colliderect(enemies.rect)): #Player cannot move through enemy (left)
-                self.rect = self.rect.move((-self.move, 0))
-                self.coordinates[0] += -self.move
-            if (self.key == "s"):
-                self.rect = self.rect.move((0, self.move))
-                self.coordinates[1] += self.move
-            if (self.key == "d") and not (self.rect.move((self.move, 0)).colliderect(enemies.rect)): #Player cannot move through enemy (right)
-                self.rect = self.rect.move((self.move, 0))
-                self.coordinates[0] += self.move
-            print(self.coordinates) #PLAYER ICON DISAPPEARS WITHOUT THIS
+        self.rect = self.rect.move((self.speed[0], self.speed[1]))
+        self.coordinates = [self.rect.x, self.rect.y]
             
     def hit(self):
         self.original = self.image
@@ -180,12 +141,27 @@ def main():
         clock.tick(60)
         for event in pygame.event.get():
             if event.type == QUIT:
-                if player.walk_thread.isAlive():
-                    player.walk_thread.join(0.1)
-                if player_input.isAlive():
-                    player_input.join(0.1)
                 pygame.quit()
                 sys.exit()
+            if event.type == KEYDOWN:
+                if event.key == K_w:
+                    player.speed[1] -= 5
+                if event.key == K_a:
+                    player.speed[0] -= 5
+                if event.key == K_s:
+                    player.speed[1] += 5
+                if event.key == K_d:
+                    player.speed[0] += 5
+                print(player.speed)
+            if event.type == KEYUP:
+                if event.key == K_w:
+                    player.speed[1] += 5
+                if event.key == K_a:
+                    player.speed[0] += 5
+                if event.key == K_s:
+                    player.speed[1] -= 5
+                if event.key == K_d:
+                    player.speed[0] -= 5
         all_sprites.update()
         screen.blit(background, (0,0))
         all_sprites.draw(screen)
@@ -194,9 +170,5 @@ def main():
 
 player = Player()
 enemies = Enemies()
-
-player.key = None
-player_input = threading.Thread(target=player.player_input)
-player_input.start()
 
 main()
