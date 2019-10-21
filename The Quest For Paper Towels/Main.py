@@ -14,28 +14,23 @@ background = pygame.Surface(screen.get_size()).convert()
 background.fill((0, 255, 0))
 pygame.display.flip()
 
-main_dir = os.path.split(os.path.abspath(__file__))[0]
-data_dir = os.path.join(main_dir, 'data')
-
-def load_image(name, colorkey=None):
-    fullname = os.path.join(data_dir, name)
-    try:
-        image = pygame.image.load(fullname)
-    except pygame.error:
-        print('Cannot load image:', fullname)
-        raise SystemExit(str(geterror()))
-    image = image.convert()
-    if colorkey is not None:
-        if colorkey == -1:
-            colorkey = image.get_at((0, 0))
-        image.set_colorkey(colorkey, RLEACCEL)
-    return image, image.get_rect(), name
+class Spritesheets: #HERE
+    def __init__(self, filepath):
+        self.sheet = pygame.image.load(filepath).convert()
+    def get_image(self, rectangle):
+        rect = pygame.Rect(rectangle)
+        image = pygame.Surface(rect.size).convert()
+        return image
+    def get_images(self, rects):
+        return [self.get_image(rect) for rect in rects]
 
 class Enemies(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.health = 10
-        self.image, self.rect, self.sprite_path = load_image(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-still.png", -1)
+        self.sprite_sheet = pygame.image.load(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\guy-who-also-wants-paper-towels-spritesheet.png").convert()
+        self.image = pygame.transform.scale(self.sprite_sheet, (77, 134))
+        self.rect = self.image.get_rect()
         self.direction = "left"
         self.rect = self.rect.move((400,0))
         self.coordinates = [self.rect.x, self.rect.y]
@@ -43,12 +38,12 @@ class Enemies(pygame.sprite.Sprite):
         self.speed = 1
     def update(self, walking = False):
         #Update direction
-        self.sprite_path = self.sprite_path.split("-")
-        if "left" in self.sprite_path: #Is enemy facing left
-            self.direction = "left"
-        else:
-            self.direction = "right"
-        self.sprite_path = "".join(self.sprite_path)
+        #self.sprite_path = self.sprite_path.split("-")
+        #if "left" in self.sprite_path: #Is enemy facing left
+            #self.direction = "left"
+        #else:
+            #self.direction = "right"
+        #self.sprite_path = "".join(self.sprite_path)
         #Update status
         if self.hit:
             self.hit()
@@ -67,13 +62,13 @@ class Enemies(pygame.sprite.Sprite):
     def walk(self):
         if (player.coordinates[0] > self.coordinates[0]): #If player is right of enemy, move right
             if self.direction == "left":
-                self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict["right-still"], -1)
+                pass
             self.original = self.image
             self.rect = self.rect.move((self.speed, 0))
             self.coordinates[0] += self.speed
         else:
             if self.direction == "right":
-                self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict["left-still"], -1)
+                pass
             self.original = self.image
             self.rect = self.rect.move((-self.speed, 0)) #Player is left of enemy; move left
             self.coordinates[0] += -self.speed
@@ -87,8 +82,7 @@ class Enemies(pygame.sprite.Sprite):
             self.coordinates[1] += -self.speed
         wait(0.01)
     def walk_animation(self, direction):
-        self.image, self.rect, self.sprite_path = load_image(self.sprite_path_dict[direction], -1)
-        self.rect = self.recg #PUT WALK PROGRAM HERE
+        pass
     sprite_path_dict = {
         "left-still": r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-still.png",
         "left-moving": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-moving.png",
@@ -101,7 +95,8 @@ class Player(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         screen = pygame.display.get_surface()
         self.health = 100
-        self.image, self.rect, self.sprite_path = load_image(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\blue-square.jpg", -1)
+        self.image = pygame.image.load(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\blue-square.jpg").convert()
+        self.rect = self.image.get_rect()
         self.area = screen.get_rect()
         self.coordinates = [self.rect.x, self.rect.y]
         self.hit = 0 #PROBLEM?
