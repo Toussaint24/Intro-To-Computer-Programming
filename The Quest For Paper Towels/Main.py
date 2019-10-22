@@ -28,31 +28,25 @@ class Enemies(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         self.health = 10
-        self.sprite_sheet = pygame.image.load(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\guy-who-also-wants-paper-towels-spritesheet.png").convert()
-        self.image = pygame.transform.scale(self.sprite_sheet, (77, 134))
+        self.sprites = [] # Declare sprites list
+        self.sprites = enemy_one_ss.get_images((0, 10, 90, 140), (90, 10, 90, 140), (180, 10, 90, 140), (270, 10, 90, 140)) #Get sprite images
+        self.image = self.sprites[0]
         self.rect = self.image.get_rect()
         self.direction = "left"
         self.rect = self.rect.move((400,0))
         self.coordinates = [self.rect.x, self.rect.y]
         self.hit = 0
-        self.speed = 1
-    def update(self, walking = False):
+        self.speed = [0, 0]
+    def update(self):
         #Update direction
-        #self.sprite_path = self.sprite_path.split("-")
-        #if "left" in self.sprite_path: #Is enemy facing left
-            #self.direction = "left"
-        #else:
-            #self.direction = "right"
-        #self.sprite_path = "".join(self.sprite_path)
+        self.direction = self.sprite_string_dict[self.image]
         #Update status
         if self.hit:
             self.hit()
         if self.rect.colliderect(player.rect):
             self.attack()
         else:
-            if not walking:
-                self.walk()
-        return
+            self.walk()
     def attack(self):
         pass
         self.original = self.image
@@ -61,15 +55,13 @@ class Enemies(pygame.sprite.Sprite):
         self.original = self.image
     def walk(self):
         if (player.coordinates[0] > self.coordinates[0]): #If player is right of enemy, move right
-            if self.direction == "left":
-                pass
-            self.original = self.image
-            self.rect = self.rect.move((self.speed, 0))
-            self.coordinates[0] += self.speed
+            self.walk_animation("right-still")
+            self.speed[0] += 1
+            self.walk_animation("right-moving")
+            self.speed[0] -= 1
+            self.walk_animation("right-still")
+            self.coordinates[0] += self.speed[0]
         else:
-            if self.direction == "right":
-                pass
-            self.original = self.image
             self.rect = self.rect.move((-self.speed, 0)) #Player is left of enemy; move left
             self.coordinates[0] += -self.speed
         self.update(True)
@@ -82,13 +74,9 @@ class Enemies(pygame.sprite.Sprite):
             self.coordinates[1] += -self.speed
         wait(0.01)
     def walk_animation(self, direction):
-        pass
-    sprite_path_dict = {
-        "left-still": r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-still.png",
-        "left-moving": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-left-moving.png",
-        "right-still": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-right-still.png",
-        "right-moving": r"\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\PH-enemy-name-right-moving.png"
-        }
+        self.image = self.string_sprite_dict[direction]
+        self.direction = self.sprite_string_dict[self.image]
+        self.rect = self.rect.move(self.speed)
 class Player(pygame.sprite.Sprite):
 
     def __init__(self):
@@ -165,5 +153,19 @@ def main():
 
 player = Player()
 enemies = Enemies()
+enemy_one_ss = Spritesheets(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\enemy-one-spritesheet.png")
+
+sprite_string_dict = {
+    enemies.sprites[0]: "left-still",
+    enemies.sprites[1]: "left-moving",
+    enemies.sprites[2]: "right-still",
+    enemies.sprites[3]: "right-moving"
+    }
+string_sprite_dict = {
+    "left-still": enemies.sprites[0],
+    "left-moving": enemies.sprites[1],
+    "right-still": enemies.sprites[2],
+    "right-moving": enemies.sprties[3]
+    }
 
 main()
