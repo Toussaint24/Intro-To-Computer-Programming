@@ -4,168 +4,296 @@ from pygame.compat import geterror
 
 pygame.init()
 
-print(os.getcwd())
+ORANGE = (194, 98, 0)
+BKGDCLR = (0, 128, 128)
+FPS = 60
 
-wait = lambda secs: time.sleep(secs)
 screen = pygame.display.set_mode((600,600))
-pygame.display.set_caption("The Quest For Paper Towels")
-pygame.mouse.set_visible(0)
+pygame.display.set_caption("The Quest For Paper Towels Experiment")
 background = pygame.Surface(screen.get_size()).convert()
-background.fill((0, 255, 0))
+
+background.fill(BKGDCLR)
 pygame.display.flip()
+
+clock = pygame.time.Clock()
+wait = lambda secs: time.sleep(secs)
+
+current_path = os.path.dirname(__file__)
+resource_path = os.path.join(current_path, "Images")
+player_sprite_path = os.path.join(resource_path, "Player-Spritesheet")
+enemy_sprite_path = os.path.join(resource_path, "Enemy-Sprites")
 
 class Spritesheets: #HERE
     def __init__(self, filepath):
         self.sheet = pygame.image.load(filepath).convert()
+        
     def get_image(self, rectangle):
         rect = pygame.Rect(rectangle)
         image = pygame.Surface(rect.size).convert()
+        image.set_colorkey(ORANGE)
+        image.blit(self.sheet, (0, 0), rect)
         return image
+        
     def get_images(self, rects):
-        return [self.get_image(rect) for rect in rects]
+        images = []
+        for rect in rects:
+            images.append(self.get_image(rect))
+        return images
 
-class Enemies(pygame.sprite.Sprite):
-    def __init__(self):
-        pygame.sprite.Sprite.__init__(self)
-        self.health = 10
-        self.sprites = [] # Declare sprites list
-        self.sprites = enemy_one_ss.get_images((0, 10, 90, 140), (90, 10, 90, 140), (180, 10, 90, 140), (270, 10, 90, 140)) #Get sprite images
-        self.image = self.sprites[0]
+class AnimatedSprite(pygame.sprite.Sprite):
+    def __init__(self, images):
+        super().__init__()
+        self.index = 0
+        self.images = images
+        self.images_right = images
+        self.images_left = [pygame.transform.flip(image, True, False) for image in images]
+        self.velocity = pygame.math.Vector2(0, 0)
+        self.image = images[self.index]
         self.rect = self.image.get_rect()
-        self.direction = "left"
-        self.rect = self.rect.move((400,0))
-        self.coordinates = [self.rect.x, self.rect.y]
-        self.hit = 0
-        self.speed = [0, 0]
-    def update(self):
-        #Update direction
-        self.direction = self.sprite_string_dict[self.image]
-        #Update status
-        if self.hit:
-            self.hit()
-        if self.rect.colliderect(player.rect):
+        self.animation_time = 0.1
+        self.current_time = 0
+        self.hit_thread = threading.Thread(target=self.hit)
+        self.attack_thread = threading.Thread(target=self.attack)
+
+    def update_time_dependent(self, dt):
+        """
+        Updates the image of Sprite approximately every 0.1 second.
+        """
+        if self.velocity.x > 0:  # Use the right images if sprite is moving right.
+            self.images = self.images_right
+        elif self.velocity.x < 0:
+            self.images = self.images_left
+
+        self.current_time += dt
+        if self.current_time >= self.animation_time:
+            self.current_time = 0
+            if self.velocity.x or self.velocity.y != 0:
+                self.index = (self.index + 1) % len(self.images) # Alternate between sprites in list but prevents calling index out of range
+                if self == player and self.index == 0:
+                    self.index = (self.index + 1) % len(self.images) # Skip player attack animation while walking
+                self.image = self.images[self.index]
+            else:
+                if self != player: 
+                    self.image = self.images[0] # Keep still image if sprite is still
+                else:
+                    self.image = self.images[1] # Playe still image is second on the sheet
+
+    def update(self, dt):
+        self.update_time_dependent(dt)
+        
+class Player(AnimatedSprite):
+    def __init__(self, health, strength, images):
+        super().__init__(images)
+        self.health = health
+        self.strength = strength
+        self.maxhealth = self.health
+        self.attacking = 0
+        self.attacked = 0
+
+    def __repr__(self):
+        return "Player"    
+
+    def update(self, dt):
+        super().update(dt)
+        if self.health <= 0:
+            self.die()
+
+        elif self.attacked:
+            if not self.hit_thread.isAlive():
+                self.hit_thread = threading.Thread(target=self.hit, name="{} Hit Thread".format(self))
+                self.hit_thread.start()
+
+        elif self.attacking:
             self.attack()
-        else:
-            self.walk()
+
+        if self.velocity.x == -4 and self.rect.x < player.velocity.x: # W
+            self.velocity.x += 4
+        elif self.velocity.x == 4 and self.rect.x > screen.get_size()[0] - self.rect.width - self.velocity.x: # S
+            self.velocity.x -= 4
+        if self.velocity.y == -4 and self.rect.y < player.velocity.y: # A
+            self.velocity.y += 4
+        elif self.velocity.y == 4 and self.rect.y > screen.get_size()[1] - self.rect.height - self.velocity.y: # D
+            self.velocity.y -= 4
+
+        self.rect = self.rect.move((self.velocity.x, self.velocity.y))
+
     def attack(self):
-        pass
-        self.original = self.image
+        self.image = self.images[0]
+        for enemy in Enemies.alive_group:
+            if self.rect.colliderect(enemy.rect):
+                enemy.attacked = 1
+        self.attacking = 0
+
     def hit(self):
-        pass
-        self.original = self.image
+        for enemy in Enemies.alive_group:
+            if self.rect.colliderect(enemy.rect):
+                attacker = enemy
+        if self.rect.x > enemy.rect.x:
+            self.rect = self.rect.move((50, 0))
+        elif enemy.rect.x > self.rect.x:
+            self.rect = self.rect.move((-50, 0))
+        self.health -= 1
+        self.attacked = 0
+
+    def die(self):
+        sys.exit()
+
+class Enemies(AnimatedSprite):
+    enemy_list = {}
+    alive_group = pygame.sprite.Group()
+    def __init__(self, name, number, health, strength, sprites):
+        super().__init__(sprites)
+        self.copy = self
+        self.name = name + "_" + number
+        self.health = health
+        self.strength = strength
+        self.enemy_list[self.name] = self
+        self.alive_enemies = 0
+        self.attacked = 0
+        self.hit_count = 0
+
+    def __repr__(self):
+            return self.name
+
+    def spawn(self, enemy, location):
+            self.rect = self.rect.move(location)
+            self.alive_group.add(self)
+            self.alive_enemies += 1
+
+    def update(self, dt):
+        if self.health <= 0:
+            self.die()
+        if self.attacked:
+            if not self.hit_thread.isAlive():
+                self.hit_thread = threading.Thread(target=self.hit, name="{} Hit Thread".format(self))
+                self.hit_thread.start()
+        elif self.rect.collidepoint(player.rect.center):
+            if not player.attacking:
+                if not self.attack_thread.isAlive():
+                    self.attacking = 1
+                    self.attack_thread = threading.Thread(target=self.attack, name="{} Attack Thread".format(self))
+                    self.attack_thread.start()
+        elif not self.attacked or not self.attacking:
+                self.walk()
+        super().update(dt)
+        self.velocity.x, self.velocity.y = 0, 0
+
     def walk(self):
-        if (player.coordinates[0] > self.coordinates[0]): #If player is right of enemy, move right
-            self.walk_animation("right-still")
-            self.speed[0] += 1
-            self.walk_animation("right-moving")
-            self.speed[0] -= 1
-            self.walk_animation("right-still")
-            self.coordinates[0] += self.speed[0]
-        else:
-            self.rect = self.rect.move((-self.speed, 0)) #Player is left of enemy; move left
-            self.coordinates[0] += -self.speed
-        self.update(True)
-        wait(0.01)
-        if (player.coordinates[1] > self.coordinates[1]): #If player is above enemy, move up
-            self.rect = self.rect.move((0, self.speed))
-            self.coordinates[1] += self.speed
-        else:
-            self.rect = self.rect.move((0, -self.speed)) #Player is below enemy; move down
-            self.coordinates[1] += -self.speed
-        wait(0.01)
-    def walk_animation(self, direction):
-        self.image = self.string_sprite_dict[direction]
-        self.direction = self.sprite_string_dict[self.image]
-        self.rect = self.rect.move(self.speed)
-class Player(pygame.sprite.Sprite):
-
-    def __init__(self):
-        pygame.sprite.Sprite.__init__(self)
-        screen = pygame.display.get_surface()
-        self.health = 100
-        self.image = pygame.image.load(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\blue-square.jpg").convert()
-        self.rect = self.image.get_rect()
-        self.area = screen.get_rect()
-        self.coordinates = [self.rect.x, self.rect.y]
-        self.hit = 0 #PROBLEM?
-        self.moving = 0
-        self.speed = [0, 0]
-
-    def update(self):
-        if self.hit:
-            self.hit()
-        if self.attack:
-            self.attack()
-        self.walk()
-
-    def walk(self):
-        self.rect = self.rect.move((self.speed[0], self.speed[1]))
-        self.coordinates = [self.rect.x, self.rect.y]
-            
-    def hit(self):
-        self.original = self.image
-        self.rect = self.rect.move((10, 0))
-        for i in range(255):
-            self.image = pygame.Surface.fill((i, 0, 0), self.rect)
-        for i in range(255, 0):
-            self.image = pygame.Surface.fill((i, 0, 0), self.rect)
-        wait(4)
-        self.image = self.original
+        if player.rect.x > self.rect.x: #Player is right of enemy
+            self.velocity.x += 1.5
+        elif self.rect.x > player.rect.x:
+            self.velocity.x -= 1.5
+        if player.rect.y > self.rect.y: #Player is below enemy
+            self.velocity.y += 1.5
+        elif self.rect.y > player.rect.y:
+            self.velocity.y -= 1.5
+        self.rect = self.rect.move((self.velocity.x, self.velocity.y))
+        
     def attack(self):
-        self.original = self.image
-    def get_healthbar(self):
-        pass
+        player.attacked = 1
+        self.attacking = 0
+    
+    def hit(self):
+        self.hit_count += 1
+        if player.rect.x > self.rect.x:
+            self.rect = self.rect.move((-50, 0))
+        elif self.rect.x > player.rect.x:
+            self.rect = self.rect.move((50, 0))
+        self.health -= 1
+        wait(0.3)
+        self.attacked = 0
+        wait(0.5) # Invulnerability time after hit
+    
+    def die(self):
+        self.alive_enemies -= 1
+        self.sprite.remove(self.alive_group)
+        self = self.copy
 
-def main():
-    clock = pygame.time.Clock()
-    all_sprites = pygame.sprite.RenderPlain((player, enemies))
-    on = True
-    while on:
-        clock.tick(60)
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == KEYDOWN:
-                if event.key == K_w:
-                    player.speed[1] -= 5
-                if event.key == K_a:
-                    player.speed[0] -= 5
-                if event.key == K_s:
-                    player.speed[1] += 5
-                if event.key == K_d:
-                    player.speed[0] += 5
-                print(player.speed)
-            if event.type == KEYUP:
-                if event.key == K_w:
-                    player.speed[1] += 5
-                if event.key == K_a:
-                    player.speed[0] += 5
-                if event.key == K_s:
-                    player.speed[1] -= 5
-                if event.key == K_d:
-                    player.speed[0] -= 5
-        all_sprites.update()
-        screen.blit(background, (0,0))
-        all_sprites.draw(screen)
-        pygame.display.flip()
-    pygame.quit()
+class Stages:
+    def __init__(self, background, enemy_information):
+        self.background = background
+        self.enemy_list = enemy_information[0]
+        self.location_list = enemy_information[1]
+        self.enemy_count = len(enemy_information[0])
+        self.enemy_types = set(enemy_information[0])
 
-player = Player()
-enemies = Enemies()
-enemy_one_ss = Spritesheets(r"C:\Users\20LabB212\Documents\Game\Quest-For-Paper-Towels\New folder\Enemy-Sprites\enemy-one-spritesheet.png")
+    def start(self):
+        """Initializes the stage by drawing the background and spawning the enemies"""
+        if self.background != None:
+            screen.blit(self.background, (0, 0))
+        for enemy in range(len(self.enemy_list)):
+            self.enemy_list[enemy].spawn(self.enemy_list[enemy], self.location_list[enemy])
 
-sprite_string_dict = {
-    enemies.sprites[0]: "left-still",
-    enemies.sprites[1]: "left-moving",
-    enemies.sprites[2]: "right-still",
-    enemies.sprites[3]: "right-moving"
-    }
-string_sprite_dict = {
-    "left-still": enemies.sprites[0],
-    "left-moving": enemies.sprites[1],
-    "right-still": enemies.sprites[2],
-    "right-moving": enemies.sprties[3]
-    }
+class Main: #basically everything to make it work properly
 
-main()
+    def main(self):
+        self.drawHealthMeter()
+        stage_1.start()
+        all_alive_group = pygame.sprite.RenderUpdates(Enemies.alive_group, player)
+        running = True
+        while running:
+            self.drawHealthMeter()
+            dt = clock.tick(FPS) / 1000.0 #Time between frames
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    running = False
+                elif event.type == KEYDOWN:
+                    if event.key == K_w:
+                        player.velocity.y -= 4
+                    if event.key == K_a:
+                        player.velocity.x -= 4
+                    if event.key == K_s:
+                        player.velocity.y += 4
+                    if event.key == K_d:
+                        player.velocity.x += 4
+                    if event.key == K_f:
+                        player.attacking = 1
+                if event.type == KEYUP:
+                    if event.key == K_w and player.velocity.y == -4:
+                        player.velocity.y += 4
+                    if event.key == K_a and player.velocity.x == -4:
+                        player.velocity.x += 4
+                    if event.key == K_s and player.velocity.y == 4:
+                        player.velocity.y -= 4
+                    if event.key == K_d and player.velocity.x == 4:
+                        player.velocity.x -= 4
+
+            all_alive_group.update(dt)
+            screen.fill(BKGDCLR)
+            all_alive_group.draw(screen)
+
+            pygame.display.update()
+
+        self._quit()
+
+    def drawHealthMeter(self):
+        for i in range(player.health): # draw red health bars
+            pygame.draw.rect(screen, (255, 0, 0),   (15, 5 + (10 * player.maxhealth) - i * 10, 20, 10))
+        for i in range(player.maxhealth): # draw the white outlines
+            pygame.draw.rect(screen, (255, 255, 255), (15, 5 + (10 * player.maxhealth) - i * 10, 20, 10), 1)
+        pygame.display.update()
+
+    def _quit(self):
+        pygame.quit()
+        sys.exit()
+
+player_ss = Spritesheets(os.path.join(player_sprite_path, "playersheet.png")).get_images(((0, 0, 32, 65), (35, 0, 38, 65), (70, 0, 38, 65), (105, 0, 38, 65)))
+disgracer_ss = Spritesheets(os.path.join(enemy_sprite_path, "enemy-one-spritesheet.png")).get_images(((190, 5, 90, 140), (275, 5, 90, 140)))
+pilgrim_ss = Spritesheets(os.path.join(enemy_sprite_path, "spritesheet (1).png")).get_images(((80, 0, 15, 65), (115, 0, 15, 65)))
+
+player = Player(10, 2, player_ss)
+
+disgracers = [None, None, None, None, None, None, None, None, None, None]
+pilgrims = [None, None, None, None, None, None, None, None, None, None]
+
+for slot in range(len(disgracers)):
+    disgracers[slot] = Enemies("The Disgracer", str(slot+1), 4, 2, disgracer_ss)
+    pilgrims[slot] = Enemies("The Pilgrim", str(slot+1), 8, 1, pilgrim_ss)
+    
+
+player_group = pygame.sprite.RenderUpdates(player)
+enemy_sprites = pygame.sprite.Group(disgracers[0], pilgrims[0])
+
+stage_1 = Stages(None, ((pilgrims[0], pilgrims[1]), ((400, 0), (0, 400))))
+
+Main().main()
