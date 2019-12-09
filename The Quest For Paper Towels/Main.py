@@ -41,14 +41,14 @@ class Spritesheets: #HERE
         return images
 
 class AnimatedSprite(pygame.sprite.Sprite):
-    def __init__(self, images):
+    def __init__(self, walk_images):
         super().__init__()
         self.index = 0
-        self.images = images
-        self.images_right = images
-        self.images_left = [pygame.transform.flip(image, True, False) for image in images]
+        self.walk_images = walk_images
+        self.walk_images_right = walk_images
+        self.walk_images_left = [pygame.transform.flip(image, True, False) for image in walk_images]
         self.velocity = pygame.math.Vector2(0, 0)
-        self.image = images[self.index]
+        self.image = walk_images[self.index]
         self.rect = self.image.get_rect()
         self.animation_time = 0.1
         self.current_time = 0
@@ -60,34 +60,30 @@ class AnimatedSprite(pygame.sprite.Sprite):
         Updates the image of Sprite approximately every 0.1 second.
         """
         if self.velocity.x > 0:  # Use the right images if sprite is moving right.
-            self.images = self.images_right
+            self.walk_images = self.walk_images_right
         elif self.velocity.x < 0:
-            self.images = self.images_left
+            self.walk_images = self.walk_images_left
 
         self.current_time += dt
         if self.current_time >= self.animation_time:
             self.current_time = 0
             if self.velocity.x or self.velocity.y != 0:
-                self.index = (self.index + 1) % len(self.images) # Alternate between sprites in list but prevents calling index out of range
-                if self == player and self.index == 0:
-                    self.index = (self.index + 1) % len(self.images) # Skip player attack animation while walking
-                self.image = self.images[self.index]
+                self.index = (self.index + 1) % len(self.walk_images) # Alternate between sprites in list but prevents calling index out of range
+                self.image = self.walk_images[self.index]
             else:
-                if self != player: 
-                    self.image = self.images[0] # Keep still image if sprite is still
-                else:
-                    self.image = self.images[1] # Player still image is second on the sheet
+                self.image = self.images[0] # Keep still image if sprite is still
 
     def update(self, dt):
         self.update_time_dependent(dt)
         
 class Player(AnimatedSprite):
-    def __init__(self, health, strength, images):
-        super().__init__(images)
+    def __init__(self, health, strength, walk_images, attack_image):
+        super().__init__(walk_images)
         self.health = health
         self.strength = strength
         self.maxhealth = self.health
-        self.arm = Arm(self.images[0])
+        self.attack_image = attack_image
+        self.arm = Arm(self.attack_image)
         self.lives = 3
         self.attacking = 0
         self.attacked = 0
@@ -99,15 +95,7 @@ class Player(AnimatedSprite):
         super().update(dt)
         if self.health <= 0:
             self.die()
-
-        elif self.attacked:
-            if not self.hit_thread.isAlive():
-                self.hit_thread = threading.Thread(target=self.hit, name="{} Hit Thread".format(self))
-                self.hit_thread.start()
-
-        elif self.attacking:
-            if not self.hit_thread.isAlive():
-                self.attack()
+        if 
 
         if self.velocity.x == -4 and self.rect.x < player.velocity.x: # W
             self.velocity.x += 4
@@ -121,22 +109,14 @@ class Player(AnimatedSprite):
         self.rect = self.rect.move((self.velocity.x, self.velocity.y))
 
     def attack(self):
-        self.image = self.images[0]
+        self.image = self.attack_image
         for enemy in Enemies.alive_group:
             if self.arm.get_rect().colliderect(enemy.rect): #HERE
                 enemy.attacked = 1
         self.attacking = 0
 
     def hit(self):
-        for enemy in Enemies.alive_group:
-            if self.rect.colliderect(enemy.rect):
-                attacker = enemy
-        if self.rect.x > attacker.rect.x:
-            self.rect = self.rect.move((50, 0))
-        elif enemy.rect.x > self.rect.x:
-            self.rect = self.rect.move((-50, 0))
-        self.health -= 1
-        self.attacked = 0
+        pass
 
     def die(self):
         if self.lives == 0:
@@ -166,7 +146,6 @@ class Enemies(AnimatedSprite):
         self.enemy_list[self.name] = self
         self.alive_enemies = 0
         self.attacked = 0
-        self.hit_count = 0
 
     def __repr__(self):
             return self.name
@@ -179,18 +158,6 @@ class Enemies(AnimatedSprite):
     def update(self, dt):
         if self.health <= 0:
             self.die()
-        for enemy in self.alive_group:
-            if self.rect.collidepoint(enemy.rect.center):
-                if enemy != self:
-                    self.rect = self.rect.move((50, 0))
-        if self.rect.collidepoint(player.rect.center):
-                self.attack()
-        elif self.attacked:
-            if not self.hit_thread.isAlive():
-                self.hit_thread = threading.Thread(target=self.hit, name="{} Hit Thread".format(self))
-                self.hit_thread.start()
-        elif not self.attacked or not self.attacking:
-                self.walk()
         super().update(dt)
         self.velocity.x, self.velocity.y = 0, 0
 
@@ -206,19 +173,10 @@ class Enemies(AnimatedSprite):
         self.rect = self.rect.move((self.velocity.x, self.velocity.y))
         
     def attack(self):
-        self.attacking = 1
-        player.attacked = 1
-        self.attacking = 0
+        pass
     
     def hit(self):
-        self.hit_count += 1
-        if player.rect.x > self.rect.x:
-            self.rect = self.rect.move((-50, 0))
-        elif self.rect.x > player.rect.x:
-            self.rect = self.rect.move((50, 0))
-        self.health -= 1
-        wait(0.1)
-        self.attacked = 0
+        pass
     
     def die(self):
         self.alive_enemies -= 1
@@ -326,12 +284,13 @@ class Main: #basically everything to make it work properly
         pygame.quit()
         sys.exit()
 
-player_ss = Spritesheets(os.path.join(player_sprite_path, "playersheet.png")).get_images(((0, 0, 32, 65), (35, 0, 38, 65), (70, 0, 38, 65), (105, 0, 38, 65)))
+player_walk_sprites = Spritesheets(os.path.join(player_sprite_path, "playersheet.png")).get_images(((0, 0, 32, 65), (70, 0, 38, 65), (105, 0, 38, 65)))
+player_attack_sprite = Spritesheets(os.path.join(player_sprite_path, "playersheet.png")).get_image((35, 0, 38, 65))
 disgracer_ss = Spritesheets(os.path.join(enemy_sprite_path, "enemy-one-spritesheet.png")).get_images(((190, 5, 90, 140), (275, 5, 90, 140)))
 pilgrim_ss = Spritesheets(os.path.join(enemy_sprite_path, "spritesheet (1).png")).get_images(((80, 0, 15, 65), (115, 0, 15, 65)))
 boss_ss = Spritesheets(os.path.join(enemy_sprite_path, "BossSheet.png")).get_images(((90, 0, 90, 140), (180, 0, 90, 140), (270, 0, 90, 140)))
 
-player = Player(10, 2, player_ss)
+player = Player(10, 2, player_walk_sprites, player_attack_sprite)
 
 disgracers = [None, None, None, None, None, None, None, None, None, None]
 pilgrims = [None, None, None, None, None, None, None, None, None, None]
