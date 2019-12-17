@@ -12,6 +12,10 @@ screen = pygame.display.set_mode((600,600))
 pygame.display.set_caption("The Quest For Paper Towels Experiment")
 background = pygame.Surface(screen.get_size()).convert()
 
+LEFT_BORDER = 0
+RIGHT_BORDER = screen.get_size()[0]
+TOP_BORDER = 0
+BOTTOM_BORDER = screen.get_size()[1]
 BORDERS = (0, 0, screen.get_size()[0], screen.get_size()[1])
 
 background.fill(BKGDCLR)
@@ -87,7 +91,7 @@ class Player(AnimatedSprite):
         self.attack_image = attack_image
         self.attack_image_left = pygame.transform.flip(attack_image, True, False)
         self.arm = Arm(self.attack_image)
-        self.rect = self.rect.move((0, BORDERS[3]/2))
+        self.rect = self.rect.move((0, BOTTOM_BORDER/2))
         self.lives = 3
         self.attacking = 0
         self.attacked = 0
@@ -106,23 +110,23 @@ class Player(AnimatedSprite):
 
         if self.velocity.x == -4 and self.rect.x < player.velocity.x: # W
             self.velocity.x += 4
-        elif self.velocity.x == 4 and self.rect.x > BORDERS[2] - self.rect.width - self.velocity.x: # S
+        elif self.velocity.x == 4 and self.rect.x > RIGHT_BORDER - self.rect.width - self.velocity.x: # S
             self.velocity.x -= 4
         if self.velocity.y == -4 and self.rect.y < player.velocity.y: # A
             self.velocity.y += 4
-        elif self.velocity.y == 4 and self.rect.y > BORDERS[3] - self.rect.height - self.velocity.y: # D
+        elif self.velocity.y == 4 and self.rect.y > BOTTOM_BORDER - self.rect.height - self.velocity.y: # D
             self.velocity.y -= 4
 
         self.rect = self.rect.move((self.velocity.x, self.velocity.y))
 
         if self.rect.x < 0:
             self.rect.x = 0
-        elif self.rect.x > BORDERS[2] - self.rect.width:
-            self.rect.x = BORDERS[2]
+        elif self.rect.x > RIGHT_BORDER - self.rect.width:
+            self.rect.x = RIGHT_BORDER
         if self.rect.y < 0:
             self.rect.y = 0
-        elif self.rect.y > BORDERS[3] - self.rect.height:
-            self.rect.y = BORDERS[3]
+        elif self.rect.y > BOTTOM_BORDER - self.rect.height:
+            self.rect.y = BOTTOM_BORDER
 
     def attack(self):
         if self.direction == "Right":
@@ -152,12 +156,9 @@ class Player(AnimatedSprite):
 
     def die(self):
         if self.lives == 0:
-            sys.exit()
+            Main.running = False
         else:
             self.lives -= 1
-
-    def is_offscreen(self):
-        pass
 
 class Arm:
     def __init__(self, image):
@@ -172,12 +173,14 @@ class Arm:
 class Enemies(AnimatedSprite):
     enemy_list = {}
     alive_group = pygame.sprite.Group()
-    def __init__(self, name, number, health, strength, sprites):
+    def __init__(self, name, number, health, strength, speed, kb_distance, sprites):
         super().__init__(sprites)
         self.copy = self
         self.name = name + "_" + number
         self.health = health
         self.strength = strength
+        self.speed = speed
+        self.kb_distance = kb_distance
         self.enemy_list[self.name] = self
         self.alive_enemies = 0
         self.attacked = 0
@@ -210,22 +213,22 @@ class Enemies(AnimatedSprite):
 
         if self.rect.x < 0:
             self.rect.x = 0
-        elif self.rect.x > BORDERS[2] - self.rect.width:
-            self.rect.x = BORDERS[2]
+        elif self.rect.x > RIGHT_BORDER - self.rect.width:
+            self.rect.x = RIGHT_BORDER
         if self.rect.y < 0:
             self.rect.y = 0
-        elif self.rect.y > BORDERS[3] - self.rect.height:
-            self.rect.y = BORDERS[3]
+        elif self.rect.y > BOTTOM_BORDER - self.rect.height:
+            self.rect.y = BOTTOM_BORDER
 
     def walk(self):
         if player.rect.center[0] > self.rect.center[0]:
-            self.velocity.x += 1.5
+            self.velocity.x += self.speed
         elif self.rect.center[0] > player.rect.center[0]:
-            self.velocity.x -= 1.5
+            self.velocity.x -= self.speed
         if player.rect.center[1] > self.rect.center[1]:
-            self.velocity.y += 1.5
+            self.velocity.y += self.speed
         elif self.rect.center[1] > player.rect.center[1]:
-            self.velocity.y -= 1.5
+            self.velocity.y -= self.speed
         self.rect = self.rect.move((self.velocity.x, self.velocity.y))
         
     def attack(self):
@@ -233,9 +236,9 @@ class Enemies(AnimatedSprite):
     
     def hit(self):
         if self.rect.x < player.rect.x:
-            self.rect = self.rect.move(-50, 0)
+            self.rect = self.rect.move(-self.kb_distance, 0)
         else:
-            self.rect = self.rect.move(50, 0)
+            self.rect = self.rect.move(self.kb_distance, 0)
         self.health -= 1
         self.attacked = 0
 
@@ -243,9 +246,7 @@ class Enemies(AnimatedSprite):
     def die(self):
         self.alive_enemies -= 1
         self.remove(self.alive_group)
-
-    def is_offscreen(self):
-        pass
+        self = self.copy
 
 class Boss(AnimatedSprite):
     boss_list = {}
@@ -263,7 +264,7 @@ class Boss(AnimatedSprite):
         pass
 
     def update(self, dt):
-        pass        
+        pass 
 
     def walk(self):
         pass
@@ -272,21 +273,18 @@ class Boss(AnimatedSprite):
         pass
 
     def hit(self):
-        self.hit_count += 1
         self.health -= 1
-        wait(0.1)
         self.attacked = 0
     
     def die(self):
         self.remove(Enemies.alive_group)
 
 class Stages:
+    stages_completed = [False, False, False]
     waves_completed = [False, False, False]
 
-    def __init__(self, backgrounds, w1_enemy_information, w2_enemy_information, w3_enemy_information):
-        self.w1_background = backgrounds[0]
-        self.w2_background = backgrounds[1]
-        self.w3_background = backgrounds[2]
+    def __init__(self, background, w1_enemy_information, w2_enemy_information, w3_enemy_information):
+        self.background = background
 
         self.enemy_list_1 = w1_enemy_information[0]
         self.location_list_1 = w1_enemy_information[1]
@@ -305,30 +303,47 @@ class Stages:
 
     def start(self):
         """Initializes the stage by drawing the background and spawning the enemies"""
+
         if self.background != None:
             screen.blit(self.background, (0, 0))
-        for enemy in range(len(self.enemy_list)):
-            self.enemy_list[enemy].spawn(self.enemy_list[enemy], self.location_list[enemy])
+
+        if self.waves_completed.count(True) == 0:
+            for enemy in range(len(self.enemy_list_1)):
+                self.enemy_list_1[enemy].spawn(self.enemy_list_1[enemy], self.location_list_1[enemy])
+
+        elif self.waves_completed.count(True) == 1:
+            for enemy in range(len(self.enemy_list_2)):
+                self.enemy_list_2[enemy].spawn(self.enemy_list_2[enemy], self.location_list_2[enemy])
+
+        elif self.waves_completed.count(True) == 2:
+            for enemy in range(len(self.enemy_list_2)):
+                self.enemy_list_2[enemy].spawn(self.enemy_list_2[enemy], self.location_list_2[enemy])
 
     def new_wave(self):
-        pass
-
-    def end(self):
-        pass
+        if not all(self.waves_completed):
+            self.waves_completed.remove(False)
+            self.waves_completed.append(True)
+        else:
+            Stages.stages_completed.remove(False)
+            Stages.stages_completed.append(True)
+            if Stages.stages_completed.count(True) == 1:
+                stage_2.start()
+            elif Stages.stages_completed.count(True) == 2:
+                stage_3.start()
+            elif Stages.stages_completed.count(True) == 3:
+                Main._quit()
 
 class Main: #basically everything to make it work properly
-    def __init__(self):
-        pass
-
     def main(self):
         self.drawHealthMeter()
         stage_1.start()
-        running = True
-        while running:
+        self.running = True
+        while self.running:
             self.all_alive_group = pygame.sprite.RenderUpdates(Enemies.alive_group, player)
             self.drawHealthMeter()
             dt = clock.tick(FPS) / 1000.0 #Time between frames
             for event in pygame.event.get():
+
                 if event.type == QUIT:
                     running = False
                 elif event.type == KEYDOWN:
@@ -351,7 +366,15 @@ class Main: #basically everything to make it work properly
                         player.velocity.y -= 4
                     if event.key == K_d and player.velocity.x == 4:
                         player.velocity.x -= 4
-                        
+
+            if len(Enemies.alive_group) == 0:
+                if Stages.stages_completed == 0:
+                    stage_1.new_wave()
+                elif Stages.stages_completed == 1:
+                    stage_2.new_wave()
+                elif Stages.stages_completed == 2:
+                    stage_3.new_wave()
+
             self.all_alive_group.update(dt)
             screen.fill(BKGDCLR)
             self.all_alive_group.draw(screen)
@@ -383,19 +406,35 @@ pilgrims = [None, None, None, None, None, None, None, None, None, None]
 boss = Boss("Boss", 10, 2, boss_ss)
 
 for slot in range(len(disgracers)):
-    disgracers[slot] = Enemies("The Disgracer", str(slot+1), 4, 2, disgracer_ss)
-    pilgrims[slot] = Enemies("The Pilgrim", str(slot+1), 8, 1, pilgrim_ss)
+    disgracers[slot] = Enemies("The Disgracer", str(slot+1), 4, 2, 3, 50, disgracer_ss)
+    pilgrims[slot] = Enemies("The Pilgrim", str(slot+1), 8, 1, 1.5, 25, pilgrim_ss)
     
 
 player_group = pygame.sprite.RenderUpdates(player)
 enemy_sprites = pygame.sprite.Group(disgracers[0], pilgrims[0])
 stage_1 = Stages(None, 
                     ((disgracers[0], disgracers[1]), #Wave 1
-                        (0, BORDERS[3]/2), (0, BORDERS[3]/2)),
+                        (RIGHT_BORDER, BOTTOM_BORDER/2), (RIGHT_BORDER, BOTTOM_BORDER/2)),
                     ((disgracers[0], disgracers[1], disgracers[2], disgracers[3]), #Wave 2
-                        (0, 0), (0, BORDERS[3]), (BORDERS[2]/2, BORDERS[3]/2), (BORDERS[2]/2, BORDERS[3]/2)),
+                        (LEFT_BORDER, RIGHT_BORDER), (LEFT_BORDER, BOTTOM_BORDER), (RIGHT_BORDER/2, BOTTOM_BORDER/2), (RIGHT_BORDER/2, BOTTOM_BORDER/2)),
                     ((disgracers[0], disgracers[1], disgracers[2], disgracers[3], disgracers[4], disgracers[5]), #Wave 3
-                        (player.rect.x+35, BORDERS[3]/2), (0, player.rect.y-50), (0, player.rect.y+50), (0, 0), (BORDERS[2], BORDERS[3]), (BORDERS[2]/2, BORDERS[3]/2)))
+                        (player.rect.x+35, BOTTOM_BORDER/2), (0, player.rect.y-50), (0, player.rect.y+50), (0, 0), (RIGHT_BORDER, BOTTOM_BORDER), (RIGHT_BORDER/2, BOTTOM_BORDER/2)))
+
+stage_2 = Stages(None,
+                    ((disgracers[0], pilgrims[0]), #Wave 1
+                        (0, 0), (0, 0)),
+                    ((disgracers[0], pilgrims[0], pilgrims[1]), #Wave 2
+                        (0, 0), (0, 0), (0, 0)),
+                    ((pilgrims[0], pilgrims[1], pilgrims[2], pilgrims[3], pilgrims[4]), #Wave 3
+                        (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)))
+
+stage_3 = Stages(None,
+                    ((disgracers[0], disgracers[1], pilgrims[0], pilgrims[1]), #Wave 1
+                        (500, 100), (375, 260), (100, 300), (375, 340)),
+                    ((disgracers[0], disgracers[1], disgracers[2], disgracers[3], pilgrims[0], pilgrims[1], pilgrims[2]), #Wave 2
+                        (515, 557), (350, 500), (472, 390), (305, 0), (240, 160), (225, 250), (150, 200)),
+                    ((boss),
+                        (90,550)))
 
 Main = Main()
 Main.main()
