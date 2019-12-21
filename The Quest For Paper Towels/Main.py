@@ -91,7 +91,7 @@ class Player(AnimatedSprite):
         self.direction = "Right"
         self.attack_image = attack_image
         self.attack_image_left = pygame.transform.flip(attack_image, True, False)
-        self.arm = Arm(self.attack_image)
+        self.arm = Arm(self.attack_image, (18, 30, 14, 13))
         self.rect = self.rect.move((0, BOTTOM_BORDER/2))
         self.lives = 3
         self.attacking = 0
@@ -163,13 +163,13 @@ class Player(AnimatedSprite):
             self.health += self.maxhealth
 
 class Arm:
-    def __init__(self, image):
-        self.image = image.subsurface((18, 30, 14, 13))
+    def __init__(self, image, rect):
+        self.image = image.subsurface(rect)
         self.rect = self.image.get_rect()
 
     def get_rect(self):
-        self.rect.x = player.rect.x + self.image.get_offset()[0]
-        self.rect.y = player.rect.y + self.image.get_offset()[1]
+        self.rect.x = self.image.get_parent().rect.x + self.image.get_offset()[0]
+        self.rect.y = self.image.get_parent().rect.y + self.image.get_offset()[1]
         return self.rect
 
 class Enemies(AnimatedSprite):
